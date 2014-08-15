@@ -1,0 +1,501 @@
+// 簡単！実践！ロボットシミュレーション
+// Open Dynamics Engineによるロボットプログラミング
+// 出村公成著, 森北出版 (2007) http://demura.net/
+// このプログラムは上本のサンプルプログラムです．
+// プログラム 3.5: Aモータ amotor.cpp by Kosei Demura (2007-5-17)
+
+//2007/6/22 お盆上で玉転がしに改変 by Eiichiro Momma
+#include <ode/ode.h>
+#include <drawstuff/drawstuff.h>
+
+// select correct drawing functions
+#ifdef dDOUBLE
+#define dsDrawBox    dsDrawBoxD
+#define dsDrawSphere dsDrawSphereD
+#define dsDrawCapsule dsDrawCapsuleD 
+#endif
+
+typedef struct {   
+  dBodyID body;     
+  dGeomID geom;     
+  dReal r, m; 
+  dReal red,green,blue;
+} MyObject;        
+
+//void makeBall(void);
+//void destroyBalls(void);
+
+//微調整用
+dReal  WORLD_STEP=0.03;
+
+enum{
+  maxBalls=10,
+  nWalls=21,
+  nEdges=6,
+  PRINT_CONTACT=0,
+  WAIT=10000,
+};
+
+static MyObject ballp[maxBalls];
+static MyObject obon;
+static MyObject edges[nEdges];
+static MyObject walls[nWalls];
+static MyObject goal;
+
+int nBalls=0;
+int isBallOnGoal=0;
+dsFunctions fn;
+dSpaceID space;
+dJointGroupID contactgroup;
+
+static dReal ALPHA = 0, BETA = 0, GAMMA = 0; // オイラー角x,y,z                                     
+static long STEPS = 0;
+static dWorldID world;
+static dBodyID  body[2],axis[3];
+static dJointID fixed[4],joint,motor,slopej,edgej[nEdges],wallj[nWalls],goalj;
+static dReal side[3] = {0.7, 0.5, 0.9}; // ボックスの辺長さ(x,y,z軸）
+static dGeomID ground;
+
+static dReal ballred=1.0;
+static dReal ballgreen=0;
+static dReal ballblue = 0;
+static dReal ballsize=1.0;
+
+static void control(dReal target, int axis_num)
+{
+  double kp = 10.0, fmax = 100.0;
+
+  dReal tmp = dJointGetAMotorAngle(motor,axis_num);
+  dReal u   = kp * (target - tmp);
+  switch (axis_num) {
+  case 0:dJointSetAMotorParam(motor,   dParamVel, u   );
+         dJointSetAMotorParam(motor,  dParamFMax, fmax); break;
+  case 1:dJointSetAMotorParam(motor,  dParamVel2, u   );
+         dJointSetAMotorParam(motor, dParamFMax2, fmax); break;
+  case 2:dJointSetAMotorParam(motor,  dParamVel3, u   );
+         dJointSetAMotorParam(motor, dParamFMax3, fmax); break;
+  }
+//  fprintf(stderr,"Alpha=%lf,Beta=%lf,Gamma=%lf\n",ALPHA,BETA,GAMMA);
+  // オイラー角の取得                                                                 
+/*  dReal e_angle = dJointGetAMotorAngle(motor,axis_num);
+  printf("%.4f ",e_angle*180.0/M_PI);*/
+}
+
+//衝突判定
+//実際にはもっとスマートな実装が可能となる関数が用意されている
+static void nearCallback(void *data, dGeomID o1, dGeomID o2)
+{
+  int i;
+  const int N = 10;
+  dContact contact[N];
+  //Ground同士なら2、1ならボールと
+  int isGround=0;
+  isGround = (ground == o1) + (obon.geom == o1) + (ground == o2) + (obon.geom == o2);
+
+  int isEdge=0;
+  for (i=0; i<nEdges; i++){
+    if (edges[i].geom == o1){
+      isEdge++;
+    }
+    if (edges[i].geom == o2){
+      isEdge++;
+    }
+  }
+  int isWall=0;
+  for (i=0; i<nWalls; i++){
+    if(walls[i].geom == o1){
+      isWall++;
+    }
+    if(walls[i].geom == o2){
+      isWall++;
+    }
+  }
+  int isBall=0;
+  for (i=0; i<nBalls; i++){
+    if (ballp[i].geom == o1){
+      isBall++;
+    }
+    if (ballp[i].geom ==o2){
+      isBall++;
+    }
+  }
+  int isGoal= 0;
+  isGoal=((goal.geom == o1) || (goal.geom == o2));
+
+
+  int n =  dCollide(o1, o2, N, &contact[0].geom, sizeof(dContact));
+  if(isBall>1){ //ボールの衝突を別のContactにしてみる
+    if(PRINT_CONTACT){
+      fprintf(stderr,"ball and ball\n");
+    }
+    for (int i = 0; i < n; i++) {
+      contact[i].surface.mode = dContactBounce;
+      contact[i].surface.bounce = 0.001; 
+      contact[i].surface.bounce_vel = 0.5;
+      dJointID c = dJointCreateContact(world, contactgroup, &contact[i]);
+      dJointAttach(c,dGeomGetBody(contact[i].geom.g1), dGeomGetBody(contact[i].geom.g2));
+    }
+  }else if(isBall ==1 && isWall == 1){//ボールと壁
+    if(PRINT_CONTACT){
+     fprintf(stderr,"ball and wall\n");
+    }
+    for (int i = 0; i < n; i++) {
+      contact[i].surface.mode = dContactBounce;
+      contact[i].surface.bounce = 0.01; 
+      contact[i].surface.bounce_vel = 0.2;
+      contact[i].surface.mu =0.4;
+      dJointID c = dJointCreateContact(world, contactgroup, &contact[i]);
+      dJointAttach(c,dGeomGetBody(contact[i].geom.g1), dGeomGetBody(contact[i].geom.g2));
+    }
+  }else if((isBall ==1 && isGround == 1) || (isBall ==1 && isEdge==1)){ //ボールとお盆
+    if(PRINT_CONTACT){
+      fprintf(stderr,"ball and ground\n");
+    }
+    if (isGround == 1){
+      //isBallOnGoal = 0;
+    }
+    for (int i = 0; i < n; i++) {
+      contact[i].surface.mode = dContactBounce;
+      contact[i].surface.bounce = 0.001; 
+      contact[i].surface.bounce_vel = 0.8;
+      contact[i].surface.mu =0.4;
+      dJointID c = dJointCreateContact(world, contactgroup, &contact[i]);
+      dJointAttach(c,dGeomGetBody(contact[i].geom.g1), dGeomGetBody(contact[i].geom.g2));
+    }
+  }else if(isGoal == 1 && isBall == 1){
+    //fprintf(stderr,"ball and goal\n");
+    if (isBallOnGoal == 0){
+      isBallOnGoal = 1;
+    }
+    for (int i = 0; i < n; i++) {
+      contact[i].surface.mode = dContactBounce;
+      contact[i].surface.bounce = 0.001; 
+      contact[i].surface.bounce_vel = 0.8;
+      contact[i].surface.mu =0.4;
+      dJointID c = dJointCreateContact(world, contactgroup, &contact[i]);
+      dJointAttach(c,dGeomGetBody(contact[i].geom.g1), dGeomGetBody(contact[i].geom.g2));
+    }
+  }else if((isWall ==1 && isGround == 1) || (isWall == 1 && isEdge == 1) ||
+    isWall==2 || isEdge==2 || (isEdge==1 && isGround==1) || (isGoal == 1 && isWall) ||
+    (isGoal == 1 && isGround == 1) || (isGoal==1 && isEdge==1)){ //無視項目
+    return;
+  } else {
+    if(PRINT_CONTACT){
+      fprintf(stderr,"設定漏れ\n");
+    }
+  }
+}
+
+
+// シミュレーションループ                                                                    
+static void simLoop(int pause)
+{
+  STEPS++;
+  if (!pause) {
+//    printf("\nSTEPS:%6d ",STEPS);
+    dSpaceCollide(space,0,&nearCallback);
+    control(ALPHA * M_PI/180.0, 0);
+    control(BETA  * M_PI/180.0, 1);
+    control(GAMMA * M_PI/180.0, 2);
+    if (isBallOnGoal == 1){
+      //ゴールで何かしたい場合
+
+      isBallOnGoal = 0;
+    }
+    dWorldStep(world,WORLD_STEP);
+		dJointGroupEmpty(contactgroup); // add
+  }
+
+  const dReal *pos,*R;
+  //玉の描画
+  for(int i=0; i<nBalls; i++){
+    dsSetColor(ballp[i].red, ballp[i].green, ballp[i].blue);
+    pos = dBodyGetPosition(ballp[i].body);
+    R   = dBodyGetRotation(ballp[i].body);
+    dGeomSphereSetRadius(ballp[i].geom,ballp[i].r*ballsize);
+    dsDrawSphere(pos, R, dGeomSphereGetRadius(ballp[i].geom));
+  }
+
+  // 物体の描画
+  dVector3 sides;
+  dsSetColor(1.0,1.0,0);
+  dsDrawBox(dBodyGetPosition(body[0]),dBodyGetRotation(body[0]),side);
+  dsSetColor(0,0,1);
+  dsDrawBox(dBodyGetPosition(body[1]),dBodyGetRotation(body[1]),side);
+
+  //お盆の描画
+  dsSetColor(obon.red,obon.green,obon.blue);
+  dGeomBoxGetLengths(obon.geom, sides);
+  dsDrawBox(dBodyGetPosition(obon.body),dBodyGetRotation(obon.body),sides);
+
+  dsSetColor(goal.red,goal.green,goal.blue);
+  dGeomBoxGetLengths(goal.geom,sides);
+  dsDrawBox(dBodyGetPosition(goal.body),dBodyGetRotation(goal.body),sides);
+
+  for (int i=0;i<nEdges;i++){
+    dsSetColor(edges[i].red,edges[i].green,edges[i].blue);
+    dGeomBoxGetLengths(edges[i].geom, sides);
+    dsDrawBox(dBodyGetPosition(edges[i].body),dBodyGetRotation(edges[i].body),sides);
+  }
+  //壁の描画
+  for (int i=0;i<nWalls;i++){
+    dsSetColorAlpha(walls[i].red,walls[i].green,walls[i].blue,0.8);
+    dGeomBoxGetLengths(walls[i].geom, sides);
+    dsDrawBox(dBodyGetPosition(walls[i].body),dBodyGetRotation(walls[i].body),sides);
+  }
+}
+
+//ボールの消去
+void destroyBalls()
+{
+  for (int i=0; i<nBalls; i++){
+    dBodyDestroy(ballp[i].body);
+    dGeomDestroy(ballp[i].geom);
+  }
+  nBalls=0;
+}
+
+// ボールの生成
+void makeBall()
+{
+  if(nBalls >= maxBalls){
+    return;
+  }
+  dMass m1;
+  dReal x0 = 0.0, y0 = 0.0, z0 = 3;
+
+  ballp[nBalls].r=0.1;
+  ballp[nBalls].m=0.2;
+  ballp[nBalls].body=dBodyCreate(world);
+  ballp[nBalls].red = ballred;
+  ballp[nBalls].green = ballgreen;
+  ballp[nBalls].blue = ballblue;
+  dMassSetZero(&m1);
+  dMassSetSphereTotal(&m1, ballp[nBalls].m, ballp[nBalls].r);
+  dBodySetMass(ballp[nBalls].body, &m1);
+  dBodySetPosition(ballp[nBalls].body, x0, y0, z0);
+  ballp[nBalls].geom = dCreateSphere(space, ballp[nBalls].r);
+  dGeomSetBody(ballp[nBalls].geom, ballp[nBalls].body);
+  nBalls++;
+}
+void command(int cmd)
+{
+  switch(cmd) {
+    case 'e': 
+      if (ALPHA < 179){
+        ALPHA++;
+      }
+      break;
+    case 'q':
+      if (ALPHA > -179){
+        ALPHA--;
+      }
+      break;
+    case 'x':
+      BETA++;
+      break;
+    case 'w':
+      BETA--;
+      break;
+    case 'd':
+      GAMMA++;
+      break;
+    case 'a':
+      GAMMA--;
+      break;
+    case 'n'://ボールの生成
+      makeBall();
+      break;
+    case 'r'://ボールをリセット
+      destroyBalls();
+      break;
+    default:
+      break;
+  }
+  //fprintf(stderr,"%lf,%lf,%lf,%c\n",ALPHA,BETA,GAMMA,(unsigned char)cmd);
+}
+
+static void start()
+{
+  static float xyz[3] = {  3.5, 0.0, 4.0};
+  static float hpr[3] = {180.0, -35.0, 0.0};
+  dsSetViewpoint (xyz,hpr);
+}
+
+static void  setDrawStuff() {
+  fn.version = DS_VERSION;
+  fn.start   = &start;
+  fn.step    = &simLoop;
+  fn.command = &command;
+  fn.stop    = NULL;
+  //dsSetSphereQuality(3);
+  //fn.path_to_textures = "/usr/local/share/drawstuff/textures/";
+    fn.path_to_textures = "C:\\local\\ode-0.9\\drawstuff\\textures";
+}
+
+
+//迷路の作成
+void makeWall()
+{
+  dReal px[nWalls]={-0.4, 0.0, 0.4, 0.7, 0.0,-0.2,-0.2,-0.4,-0.7,-1.0,-1.2,-1.2,-1.6,-0.9,-0.4, 0.0, 0.7, 1.0, 1.2, 1.6, 1.4};
+  dReal py[nWalls]={ 0.0,-0.4, 0.7, 0.4, 0.7, 1.0, 1.4, 1.6, 0.0, 0.0, 1.0,-0.4, 0.4,-1.4,-1.4,-1.0,-1.4,-0.5,-0.4,-1.0, 0.9};
+  dReal pz[nWalls]={ 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1, 2.1};
+  dReal sx[nWalls]={0.05, 0.8,0.05, 1.4,0.05, 0.4, 0.4,0.05, 0.6,0.05, 0.4, 0.4, 0.4, 1.0,0.05, 0.8, 0.6,0.05, 0.4, 0.4,0.05};
+  dReal sy[nWalls]={ 0.8,0.05, 2.2,0.05, 0.6,0.05,0.05, 0.4,0.05, 2.0,0.05,0.05,0.05,0.05, 0.8,0.05,0.05, 1.8,0.05,0.05, 1.0};
+  dReal sz[nWalls]={ 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2};
+  dReal color[3]={1,1,1};
+
+  dReal m=0.1;
+  dMass mass;
+  for(int i=0; i<nWalls; i++){
+    dMassSetZero(&mass);
+    dMassSetBoxTotal(&mass, m, sx[i], sy[i], sz[i]);
+    walls[i].red=color[0];
+    walls[i].green=color[1];
+    walls[i].blue=color[2];
+    walls[i].body = dBodyCreate(world);
+    dBodySetMass(walls[i].body,&mass);
+    dBodySetPosition(walls[i].body, px[i], py[i], pz[i]);
+    walls[i].geom = dCreateBox(space,sx[i],sy[i],sz[i]);
+    dGeomSetBody(walls[i].geom,walls[i].body);
+    wallj[i] = dJointCreateFixed(world, 0);
+    dJointAttach(wallj[i], obon.body, walls[i].body);
+    dJointSetFixed(wallj[i]);
+  }
+}
+
+
+void makeObon(void)
+{
+	dReal anchor_x = 0.0, anchor_y = 0.0, anchor_z = 0.5, m = 0.1;
+  dReal px[2]      = {0.0,  0.0};      // ボックスの位置
+  dReal py[2]      = {0.0,  0.0};
+  dReal pz[2]      = {0.45, 1.35};
+  dReal anch_x[3]  = {0.0, 0.5, 0.0};  // 軸の位置
+  dReal anch_y[3]  = {0.0, 0.0, 0.5};
+  dReal anch_z[3]  = {1.0, 0.5, 0.5};
+  dReal axis_x[3]  = {0.0, 0.0, 1.0};  // 軸の向き
+  dReal axis_y[3]  = {0.0, 1.0, 0.0};
+  dReal axis_z[3]  = {1.0, 0.0, 0.0};
+  dReal angle[3]   = {0, M_PI/2, M_PI/2};
+
+  //お盆の設定(デカい)
+  dMass mass,massobon,massedge,massgoal;
+  dMassSetZero(&massobon);
+  dMassSetBoxTotal(&massobon, m, 4, 4, 0.2);
+  obon.red=1.0;
+  obon.green=1.0;
+  obon.blue=0.5;
+  obon.body = dBodyCreate(world);
+  dBodySetMass(obon.body,&massobon);
+  dBodySetPosition(obon.body, 0, 0, 1.9);
+//  dQuaternion q;
+//  dQFromAxisAndAngle(q,0,0,1,0);
+//  dBodySetQuaternion(obon.body,q);
+  obon.geom = dCreateBox(space,4,4,0.2);
+  dGeomSetBody(obon.geom,obon.body);
+
+  //ゴール
+  dMassSetZero(&massgoal);
+  dMassSetBoxTotal(&massgoal, m/5, 0.6, 1, 0.05);
+  goal.red=1.0;
+  goal.green=0.0;
+  goal.blue=0.0;
+  goal.body = dBodyCreate(world);
+  dBodySetMass(goal.body,&massgoal);
+  dBodySetPosition(goal.body, 0.9, 1.15, 1.99);
+  goal.geom = dCreateBox(space,0.6,1,0.05);
+  dGeomSetBody(goal.geom,goal.body);
+  goalj = dJointCreateFixed(world, 0);
+  dJointAttach(goalj, obon.body, goal.body);
+  dJointSetFixed(goalj);
+
+  //お盆のエッジ
+  dReal ex[nEdges] = {0.0,-1.9,-1.9,0.0,1.9,1.9};
+  dReal ey[nEdges] = {1.9,1.1,-0.9,-1.9,-0.9,0.9};
+  dReal ez[nEdges] = {2.1,2.1,2.1,2.1,2.1,2.1};
+  dReal er[nEdges] = {1.0,1.0,1.0,0.0,0.0,0.0};
+  dReal eg[nEdges] = {0.3,0.8,0.0,1.0,1.0,1.0};
+  dReal eb[nEdges] = {0.3,0.3,0.0,0.0,1.0,1.0};
+  dReal sx[nEdges] = {4.0,0.2,0.2,4.0,0.2,0.2};
+  dReal sy[nEdges] = {0.2,1.4,1.8,0.2,1.0,1.8};
+  dReal sz[nEdges] = {0.2,0.2,0.2,0.2,0.2,0.2};
+  for (int i=0; i< nEdges;i++) {
+    edges[i].body = dBodyCreate(world);
+    edges[i].red = er[i];
+    edges[i].green = eg[i];
+    edges[i].blue = eb[i];
+    dMassSetZero(&massedge);
+    dMassSetBoxTotal(&massedge, m, sx[i], sy[i], sz[i]);
+    dBodySetMass(edges[i].body,&massedge);
+    dBodySetPosition(edges[i].body, ex[i], ey[i], ez[i]);
+    edges[i].geom=dCreateBox(space,sx[i],sy[i],sz[i]);
+    dGeomSetBody(edges[i].geom,edges[i].body);
+  }
+
+
+  //土台
+  dMassSetZero(&mass);
+  dMassSetBoxTotal(&mass, m, side[0], side[1], side[2]);
+  for (int i=0; i< 2;i++) {
+    body[i] = dBodyCreate(world);
+    dBodySetMass(body[i],&mass);
+    dBodySetPosition(body[i], px[i], py[i], pz[i]);
+  }
+ 
+  // 静的環境とベースの結合                                         
+  fixed[0] = dJointCreateFixed(world, 0);
+  dJointAttach(fixed[0], body[0], 0);
+  dJointSetFixed(fixed[0]);
+
+  //お盆と土台の結合
+  slopej=dJointCreateFixed(world,0);
+  dJointAttach(slopej,body[1],obon.body);
+  dJointSetFixed(slopej);
+
+  //お盆にエッジを結合
+  for (int i = 0; i < nEdges; i++) {
+    edgej[i] = dJointCreateFixed(world, 0);
+    dJointAttach(edgej[i], obon.body, edges[i].body);
+    dJointSetFixed(edgej[i]);
+  }
+
+  // ボールジョイントの生成と設定                                                        
+  joint       = dJointCreateBall(world,0);
+  dJointAttach(joint,body[0],body[1]);
+  dJointSetBallAnchor(joint,anchor_x,anchor_y,anchor_z);
+
+  // Aモータの生成と設定                                                            
+  motor  = dJointCreateAMotor(world,0);
+  dJointAttach(motor,body[0],body[1]);
+  dJointSetAMotorNumAxes(motor,3);
+  dJointSetAMotorAxis(motor,0,1,0,0,1);
+  dJointSetAMotorAxis(motor,1,2,0,1,0);
+  dJointSetAMotorAxis(motor,2,2,1,0,0);
+  dJointSetAMotorMode(motor,dAMotorEuler);
+
+}
+
+
+int main(int argc, char **argv)
+{
+  setDrawStuff();
+                                                                   
+  world = dWorldCreate();
+//  dWorldSetGravity(world,0,0,-1.6);
+  dWorldSetGravity(world,0,0,-9.8);
+  dWorldSetCFM(world,1e-3); // CFMの設定
+  dWorldSetERP(world,0.8);  // ERPの設定
+
+  space = dHashSpaceCreate(0);
+  contactgroup = dJointGroupCreate(0);
+  ground = dCreatePlane(space,0,0,1,0); 
+
+  makeBall();
+  makeObon();
+  makeWall();
+
+  dsSimulationLoop(argc,argv,640,480,&fn);
+  dWorldDestroy(world);
+  return 0;
+}

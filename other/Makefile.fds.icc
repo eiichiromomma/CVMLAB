@@ -1,0 +1,44 @@
+# Makefile for Lahey Fortran and Gnu C on RedHat Linux
+
+FFLAGS     = -O3 -i-static
+CFLAGS     = -O3 -Dpp_noappend
+obj     = fds4_icc
+FCOMPL  = LC_ALL=C ifort
+CCOMPL  = LC_ALL=C icc
+
+.SUFFIXES:
+.SUFFIXES: .c .f .o
+
+.f.o:
+	$(FCOMPL) -c $(FFLAGS) $<
+.c.o:
+	$(CCOMPL) -c $(CFLAGS) $<
+
+OBJECTS = mods.o \
+          pois.o misc.o radi.o sprk.o \
+          dump.o read.o mass.o  pres.o \
+          divg.o init.o  \
+          isob.o velo.o  main.o \
+
+APPLIC: $(INLINE1) $(INLINE2) $(OBJECTS)
+	$(FCOMPL) $(FFLAGS) -o $(obj) $(OBJECTS)
+
+INLINE1 = mods.f
+INLINE2 = pois.f misc.f radi.f
+INLINE3 = divg.f init.f dump.f sprk.f read.f mass.f pres.f velo.f
+
+mods.o : mods.f
+pois.o : pois.f $(INLINE1)
+misc.o : misc.f $(INLINE1) 
+radi.o : radi.f $(INLINE1) 
+sprk.o : sprk.f $(INLINE1)
+divg.o : divg.f $(INLINE1)
+mass.o : mass.f $(INLINE1) $(INLINE2)
+init.o : init.f $(INLINE1) $(INLINE2)
+read.o : read.f $(INLINE1)
+pres.o : pres.f $(INLINE1) $(INLINE2)
+velo.o : velo.f $(INLINE1)
+dump.o : dump.f $(INLINE1) $(INLINE2)
+main.o : main.f $(INLINE1) $(INLINE2) $(INLINE3)
+isob.o : isob.c
+

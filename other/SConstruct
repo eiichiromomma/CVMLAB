@@ -1,0 +1,34 @@
+#
+# SConstruct for NPSTutorials
+# By Eiichiro Momma
+#
+
+import os
+env = Environment(ENV = os.environ,
+                  CC = 'g++',
+                  CCFLAGS = '-Wall',
+                  LIBS=["osgProducer", "png", "z"])
+simEnv = env.Copy (LIBS=["osgSim", "osgProducer", "png", "z"])
+particleEnv = env.Copy (LIBS=["osgParticle", "osgProducer", "png", "z"])
+
+
+env.Program ("Tutorial_02/GeometryTest", "Tutorial_02/GeometryTest.cpp")
+env.Program ("Tutorial_03/texturedGeometry", "Tutorial_03/texturedGeometry.cpp")
+env.Program ("Tutorial_04/TestState", "Tutorial_04/TestState.cpp")
+env.Program ("Tutorial_05/TestTutorial", "Tutorial_05/TestTutorial.cpp")
+env.Program ("Tutorial_06/SimpleHUD", "Tutorial_06/SimpleHUD.cpp")
+simEnv.Program ("Tutorial_07/TestSwitchDOF", ["Tutorial_07/TestSwitchDOF.cpp","Tutorial_07/findNodeVisitor.cpp"])
+simEnv.Program ("Tutorial_08/TestUpdateCallback", ["Tutorial_08/TestUpdateCallback.cpp", "Tutorial_08/findNodeVisitor.cpp"])
+simEnv.Program ("Tutorial_09/testKeyboard", ["Tutorial_09/testKeyboard.cpp","Tutorial_09/KeyboardHandler.cpp","Tutorial_09/findNodeVisitor.cpp"])
+env.Program ("Tutorial_10/TestManualCamera", ["Tutorial_10/TestManualCamera.cpp","Tutorial_10/KeyboardHandler.cpp"])
+env.Program ("Tutorial_11.1/TestNodeFollower", "Tutorial_11.1/TestNodeFollower.cpp")
+env.Program ("Tutorial_11.2/TestOrbit", ["Tutorial_11.2/TestOrbit.cpp","Tutorial_11.2/KeyboardHandler.cpp"])
+env.Program ("Tutorial_12/WorkingTwoCamera", ["Tutorial_12/WorkingTwoCamera.cpp","Tutorial_12/TransformAccumulator.cpp"])
+simEnv.Program ("Tutorial_13/TestMultiCamera", ["Tutorial_13/TestMultiCamera.cpp",\
+"Tutorial_13/FollowNodeManip.cpp","Tutorial_13/TransformAccumulator.cpp","Tutorial_13/findNodeVisitor.cpp"])
+env.Program ("Tutorial_14.1/TestShaderIntro", "Tutorial_14.1/TestShaderIntro.cpp")
+env.Program ("Tutorial_14.2/TestShaderTwo", "Tutorial_14.2/TestShaderTwo.cpp")
+env.Program ("Tutorial_14.3/TestShaderThree", "Tutorial_14.3/TestShaderThree.cpp")
+env.Program ("Tutorial_15/TestBillboard", "Tutorial_15/TestBillboard.cpp")
+env.Program ("Tutorial_16/TestIntersect", "Tutorial_16/TestIntersect.cpp")
+particleEnv.Program ("Tutorial_17/TestParticle", "Tutorial_17/TestParticle.cpp")

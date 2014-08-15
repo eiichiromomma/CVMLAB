@@ -1,0 +1,194 @@
+##2007/9/15 Eiichiro Momma
+##一括解析関数
+analyze.mygname<-function(z,filename="myfile",gname="mygname",directory="mydata",numfactor=TRUE,out=FALSE)
+{ 
+  require(lattice)
+  require(mvpart)
+  require(MASS)
+  require(nnet)
+  require(kernlab)
+  plot.new()
+  par(xpd=T)
+  idx <- 0
+  directory<-paste(directory,"/",sep="")
+  
+  y<-1:dim(z)[2]
+  gnum<-y[names(z)==gname]
+  tmpz<- z[-gnum]
+  tmpz2<- data.frame(mygroup=z[[gnum]],tmpz)
+  zzz<- data.frame(myfactor=as.factor(z[[gnum]]),tmpz)
+  z<-tmpz2
+  attach(z)
+
+  ##
+  print(splom(~ z,groups=mygroup))
+  if(out==TRUE){
+    idx <- idx+1
+    win.metafile(paste(directory,filename,idx,".emf",sep=""),width=14,height=14)
+    print(splom(~ z,groups=mygroup))
+    tmp_<-dev.off()
+  }
+  tmp_<-readline(paste(filename,"散布図行列 mygroup is ",gname))
+  ##
+  print(parallel(z,col=as.integer(as.numeric(z$mygroup) *2),lty=as.integer(as.numeric(z$mygroup) *2)))
+  if(out==TRUE){
+    idx <- idx+1
+    win.metafile(paste(directory,filename,idx,".emf",sep=""),width=14,height=14)
+    print(parallel(z,col=as.integer(as.numeric(z$mygroup) *2),lty=as.integer(as.numeric(z$mygroup) *2)))
+        
+    tmp_<-dev.off()
+  }
+  tmp_<-readline(paste(filename,"パラレルプロット mygroup is ",gname))
+  ##
+  if(is.numeric(z$mygroup)){
+    c<-cor(z,method="spearman")
+    s<-symnum(abs(cor(z,method="spearman")),cutpoints=seq(0,1,0.2),symbols=c(" ",".","-","+","*"))
+  }else{
+    c<-cor(tmpz,method="spearman")
+    s<-symnum(abs(cor(tmpz,method="spearman")),cutpoints=seq(0,1,0.2),symbols=c(" ",".","-","+","*"))
+  }
+  print(list(c,s))
+  if(out==TRUE){
+    sink(paste(directory,filename,".cor",".txt",sep=""))
+    print(list(c,s))
+    sink()
+  }
+  tmp_<-readline(paste(filename,"クロス相関 mygroup is ",gname))
+  ##
+  if(is.numeric(z$mygroup)){
+    c<-cor3(z)
+    s<-symnum(abs(cor3(z)),cutpoints=seq(0,1,0.2),symbols=c(" ",".","-","+","*"))
+  }else{
+    c<-cor3(tmpz)
+    s<-symnum(abs(cor3(tmpz)),cutpoints=seq(0,1,0.2),symbols=c(" ",".","-","+","*"))
+    
+  }
+  print(list(c,s))
+  if(out==TRUE){
+    sink(paste(directory,filename,".cor3",".txt",sep=""))
+    print(list(c,s))
+    sink()
+  }
+  tmp_<-readline(paste(filename,"偏相関 mygroup is ",gname))
+  ##
+  if(is.numeric(z$mygroup)){
+    d1<-lm(z$mygroup ~ .,data=z)
+    d1s<-summary(d1)
+    d2<-step(d1)
+    d2s<-summary(d2)
+    print(list(d1,d1s,d2,d2s))
+    if(out==TRUE){
+      sink(paste(directory,filename,".lm",".txt",sep=""))
+      print(list(d1,d1s,d2,d2s))
+      sink()
+    }
+    tmp_<-readline(paste(filename,"1次変数選択 mygroup is ",gname))
+    ##
+    d1<-lm(z$mygroup~.^2,data=z)
+    d1s<-summary(d1)
+    d2<-step(d1)
+    d2s<-summary(d2)
+    print(list(d1,d1s,d2,d2s))
+    
+    if(out==TRUE){
+      sink(paste(directory,filename,".lm2",".txt",sep=""))
+      print(list(d1,d1s,d2,d2s))
+      sink()
+    }
+    tmp_<-readline(paste(filename,"2次変数選択 mygroup is ",gname))
+  }
+  ##
+  
+  result<-rpart(zzz$myfactor~.,data=zzz,control=rpart.control(cp=0.01,nsplit=10))
+  plotcp(result)
+  mycp <- as.numeric(readline("enter newcp :"))
+  result<-rpart(zzz$myfactor~.,data=zzz,control=rpart.control(cp=mycp,nsplit=10))
+  plot.new()
+  par(xpd=T)
+  print(plot(result,uniform=T,branch=0.7,margin=0.05))
+  text(result,use.n=T,all.leaves=F)
+  if(out==TRUE){
+    idx <- idx+1
+    win.metafile(paste(directory,filename,idx,".emf",sep=""),width=14,height=14)
+    par(xpd=T)
+    print(plot(result,uniform=T,branch=0.7,margin=0.05))
+    text(result,use.n=T,all.leaves=F)
+    tmp_<-dev.off()
+  }
+  tmp_<-readline(paste(filename,"回帰木 myfactor is ",gname))
+  ##
+  detach(z)
+  attach(zzz)
+  tmp<-sample(seq(1,dim(zzz)[1]),dim(zzz)[1]*2/3)
+  x<-zzz[tmp,]
+  y<-zzz[-tmp,]
+  if(out==TRUE){
+    write.table(x,paste(directory,filename,".x",".rdata",sep=""))
+    write.table(y,paste(directory,filename,".y",".rdata",sep=""))
+  }
+  ##
+  result<-rpart(myfactor~.,data=x,control=rpart.control(cp=0.01,nsplit=10))
+  plotcp(result)
+  mycp <- as.numeric(readline("enter newcp :"))
+  result<-rpart(myfactor~.,data=x,control=rpart.control(cp=mycp,nsplit=10))
+  result2<-predict(result,y,type="class")
+  print(table(y$myfactor,result2))
+  if(out==TRUE){
+    sink(paste(directory,filename,".rpart",".txt",sep=""))
+    print(table(y$myfactor,result2))
+    sink()
+  }
+  tmp_<-readline(paste(filename,"回帰木による予測結果 myfactor is ",gname))
+  ##
+  result<-lda(myfactor~.,data=x)
+  result2<-predict(result,y)$class
+  print(table(y$myfactor,result2))
+  if(out==TRUE){
+    sink(paste(directory,filename,".lda",".txt",sep=""))
+    print(table(y$myfactor,result2))
+    sink()
+  }
+  tmp_<-readline(paste(filename,"1次の判別分析による予測結果 myfactor is ",gname))
+  ##
+  result<-qda(myfactor~.,data=x)
+  result2<-predict(result,y)$class
+  print(table(y$myfactor,result2))
+  if(out==TRUE){
+    sink(paste(directory,filename,".qda",".txt",sep=""))
+    print(table(y$myfactor,result2))
+    sink()
+  }
+  tmp_<-readline(paste(filename,"2次の判別分析による予測結果 myfactor is ",gname))
+  ##
+  result<-nnet(myfactor~.,size=15,data=x)
+  result2<-predict(result,y,type="class")
+  print(table(y$myfactor,result2))
+  if(out==TRUE){
+    sink(paste(directory,filename,".nnet",".txt",sep=""))
+    print(table(y$myfactor,result2))
+    sink()
+  }
+  tmp_<-readline(paste(filename,"NeuralNetworkによる予測結果 myfactor is ",gname))
+  ##
+  result<-ksvm(myfactor~.,data=x)
+  result2<-predict(result,y)
+  print(table(y$myfactor,result2))
+  if(out==TRUE){
+    sink(paste(directory,filename,".ksvm",".txt",sep=""))
+    print(table(y$myfactor,result2))
+    sink()
+  }
+  tmp_<-readline(paste(filename,"SupportVectorMachineによる予測結果 myfactor is ",gname))
+  ##
+  detach(zzz)
+}
+## Rで学ぶデータマイニングより偏相関
+cor3<-function(xx){
+  xx<-xx[complete.cases(xx),]
+  rr<-cor(xx);ii<-solve(rr)
+  dd<-diag(ii);diag(rr)<-sqrt(1-1/dd)
+  pp<-ii/sqrt(outer(dd,dd))
+  rr[lower.tri(rr)]<-pp[lower.tri(pp)]
+  rownames(rr)<-colnames(rr)<-names(xx)
+  return(rr)
+}

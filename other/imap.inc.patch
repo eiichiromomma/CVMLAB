@@ -1,0 +1,286 @@
+*** imap.inc.org	2010-03-26 15:59:40.000000000 +0900
+--- imap.inc	2010-03-26 16:02:47.000000000 +0900
+***************
+*** 316,322 ****
+  	$conn=iil_Connect($host, $user, $password, "plain");
+  	$fp = $conn->fp;
+  	if ($fp){
+! 		fputs($fp, "a002 EXAMINE \"".UTF7EncodeString($mailbox)."\"\r\n");
+  		do{
+  			$line=chop(iil_ReadLine($fp, 300));
+  			$a=explode(" ", $line);
+--- 316,322 ----
+  	$conn=iil_Connect($host, $user, $password, "plain");
+  	$fp = $conn->fp;
+  	if ($fp){
+! 		fputs($fp, "a002 EXAMINE \"".mb_convert_encoding($mailbox,"UTF7-IMAP", "EUC-JP")."\"\r\n");
+  		do{
+  			$line=chop(iil_ReadLine($fp, 300));
+  			$a=explode(" ", $line);
+***************
+*** 335,341 ****
+  	
+  	$fp = $conn->fp;
+  	if ($fp){
+! 		fputs($fp, "a002 EXAMINE \"".UTF7EncodeString($mailbox)."\"\r\n");
+  		do{
+  			$line=chop(iil_ReadLine($fp, 300));
+  			$a=explode(" ", $line);
+--- 335,341 ----
+  	
+  	$fp = $conn->fp;
+  	if ($fp){
+! 		fputs($fp, "a002 EXAMINE \"".mb_convert_encoding($mailbox,"UTF7-IMAP", "EUC-JP")."\"\r\n");
+  		do{
+  			$line=chop(iil_ReadLine($fp, 300));
+  			$a=explode(" ", $line);
+***************
+*** 353,359 ****
+  	if (empty($mailbox)) return false;
+  	if (strcmp($conn->selected, $mailbox)==0) return true;
+  	
+! 	if (fputs($fp, "sel1 SELECT \"".UTF7EncodeString($mailbox)."\"\r\n")){
+  		do{
+  			$line=chop(iil_ReadLine($fp, 300));
+  		}while (!iil_StartsWith($line, "sel1"));
+--- 353,359 ----
+  	if (empty($mailbox)) return false;
+  	if (strcmp($conn->selected, $mailbox)==0) return true;
+  	
+! 	if (fputs($fp, "sel1 SELECT \"".mb_convert_encoding($mailbox,"UTF7-IMAP", "EUC-JP")."\"\r\n")){
+  		do{
+  			$line=chop(iil_ReadLine($fp, 300));
+  		}while (!iil_StartsWith($line, "sel1"));
+***************
+*** 373,379 ****
+  	$num=-1;
+  	$fp = $conn->fp;
+  		
+! 	if (fputs($fp, "cm1 SELECT \"".UTF7EncodeString($mailbox)."\"\r\n")){
+  		do{
+  			$line=chop(iil_ReadLine($fp, 300));
+  			$a=explode(" ", $line);
+--- 373,379 ----
+  	$num=-1;
+  	$fp = $conn->fp;
+  		
+! 	if (fputs($fp, "cm1 SELECT \"".mb_convert_encoding($mailbox,"UTF7-IMAP", "EUC-JP")."\"\r\n")){
+  		do{
+  			$line=chop(iil_ReadLine($fp, 300));
+  			$a=explode(" ", $line);
+***************
+*** 854,860 ****
+  	if (iil_C_Select($conn, $from)){
+  		$c=0;
+  		
+! 		fputs($fp, "cpy1 COPY $messages \"".UTF7EncodeString($to)."\"\r\n");
+  		$line=iil_ReadReply($fp);
+  		return iil_ParseResult($line);
+  	}else{
+--- 854,860 ----
+  	if (iil_C_Select($conn, $from)){
+  		$c=0;
+  		
+! 		fputs($fp, "cpy1 COPY $messages \"".mb_convert_encoding($to,"UTF7-IMAP", "EUC-JP")."\"\r\n");
+  		$line=iil_ReadReply($fp);
+  		return iil_ParseResult($line);
+  	}else{
+***************
+*** 958,964 ****
+  	$fp = $conn->fp;
+  	if (empty($mailbox)) $mailbox="*";
+      // send command
+! 	if (!fputs($fp, "lmb LIST \"".$ref."\" \"".UTF7EncodeString($mailbox)."\"\r\n")) return false;
+  	$i=0;
+      // get folder list
+  	do{
+--- 958,964 ----
+  	$fp = $conn->fp;
+  	if (empty($mailbox)) $mailbox="*";
+      // send command
+! 	if (!fputs($fp, "lmb LIST \"".$ref."\" \"".mb_convert_encoding($mailbox,"UTF7-IMAP", "EUC-JP")."\"\r\n")) return false;
+  	$i=0;
+      // get folder list
+  	do{
+***************
+*** 970,976 ****
+              // split one line
+  			$a=iil_ExplodeQuotedString(" ", $line);
+              // last string is folder name
+! 			$folder = UTF7DecodeString(str_replace("\"", "", $a[count($a)-1]));
+              if (empty($ignore) || (!empty($ignore) && !eregi($ignore, $folder))) $folders[$i] = $folder;
+              // second from last is delimiter
+              $delim = str_replace("\"", "", $a[count($a)-2]);
+--- 970,976 ----
+              // split one line
+  			$a=iil_ExplodeQuotedString(" ", $line);
+              // last string is folder name
+! 			$folder = mb_convert_encoding(str_replace("\"", "", $a[count($a)-1]),"EUC-JP", "UTF7-IMAP");
+              if (empty($ignore) || (!empty($ignore) && !eregi($ignore, $folder))) $folders[$i] = $folder;
+              // second from last is delimiter
+              $delim = str_replace("\"", "", $a[count($a)-2]);
+***************
+*** 1003,1009 ****
+  	if (empty($mailbox)) $mailbox="*";
+  	$folders = array();
+      // send command
+! 	if (!fputs($fp, "lsb LSUB \"".$ref."\" \"".UTF7EncodeString($mailbox)."\"\r\n")) return false;
+  	$i=0;
+      // get folder list
+  	do{
+--- 1003,1009 ----
+  	if (empty($mailbox)) $mailbox="*";
+  	$folders = array();
+      // send command
+! 	if (!fputs($fp, "lsb LSUB \"".$ref."\" \"".mb_convert_encoding($mailbox,"UTF7-IMAP", "EUC-JP")."\"\r\n")) return false;
+  	$i=0;
+      // get folder list
+  	do{
+***************
+*** 1015,1021 ****
+              // split one line
+  			$a=iil_ExplodeQuotedString(" ", $line);
+              // last string is folder name
+!             $folder = UTF7DecodeString(str_replace("\"", "", $a[count($a)-1]));
+  			if ((!in_array($folder, $folders)) && (empty($ignore) || (!empty($ignore) && !eregi($ignore, $folder)))) $folders[$i] = $folder;
+              // second from last is delimiter
+              $delim = str_replace("\"", "", $a[count($a)-2]);
+--- 1015,1021 ----
+              // split one line
+  			$a=iil_ExplodeQuotedString(" ", $line);
+              // last string is folder name
+!             $folder = mb_convert_encoding(str_replace("\"", "", $a[count($a)-1]),"EUC-JP", "UTF7-IMAP");
+  			if ((!in_array($folder, $folders)) && (empty($ignore) || (!empty($ignore) && !eregi($ignore, $folder)))) $folders[$i] = $folder;
+              // second from last is delimiter
+              $delim = str_replace("\"", "", $a[count($a)-2]);
+***************
+*** 1042,1048 ****
+  function iil_C_Subscribe(&$conn, $folder){
+  	$fp = $conn->fp;
+  
+! 	$query = "sub1 SUBSCRIBE \"".UTF7EncodeString($folder)."\"\r\n";
+  	fputs($fp, $query);
+  	$line=trim(chop(iil_ReadLine($fp, 10000)));
+  	return iil_ParseResult($line);
+--- 1042,1048 ----
+  function iil_C_Subscribe(&$conn, $folder){
+  	$fp = $conn->fp;
+  
+! 	$query = "sub1 SUBSCRIBE \"".mb_convert_encoding($folder,"UTF7-IMAP", "EUC-JP")."\"\r\n";
+  	fputs($fp, $query);
+  	$line=trim(chop(iil_ReadLine($fp, 10000)));
+  	return iil_ParseResult($line);
+***************
+*** 1052,1058 ****
+  function iil_C_UnSubscribe(&$conn, $folder){
+  	$fp = $conn->fp;
+  
+! 	$query = "usub1 UNSUBSCRIBE \"".UTF7EncodeString($folder)."\"\r\n";
+  	fputs($fp, $query);
+  	$line=trim(chop(iil_ReadLine($fp, 10000)));
+  	return iil_ParseResult($line);
+--- 1052,1058 ----
+  function iil_C_UnSubscribe(&$conn, $folder){
+  	$fp = $conn->fp;
+  
+! 	$query = "usub1 UNSUBSCRIBE \"".mb_convert_encoding($folder,"UTF7-IMAP", "EUC-JP")."\"\r\n";
+  	fputs($fp, $query);
+  	$line=trim(chop(iil_ReadLine($fp, 10000)));
+  	return iil_ParseResult($line);
+***************
+*** 1168,1174 ****
+  
+  function iil_C_CreateFolder(&$conn, $folder){
+  	$fp = $conn->fp;
+! 	if (fputs($fp, "c CREATE \"".UTF7EncodeString($folder)."\"\r\n")){
+  		do{
+  			$line=iil_ReadLine($fp, 300);
+  		}while($line[0]!="c");
+--- 1168,1174 ----
+  
+  function iil_C_CreateFolder(&$conn, $folder){
+  	$fp = $conn->fp;
+! 	if (fputs($fp, "c CREATE \"".mb_convert_encoding($folder,"UTF7-IMAP", "EUC-JP")."\"\r\n")){
+  		do{
+  			$line=iil_ReadLine($fp, 300);
+  		}while($line[0]!="c");
+***************
+*** 1181,1187 ****
+  
+  function iil_C_RenameFolder(&$conn, $from, $to){
+  	$fp = $conn->fp;
+! 	if (fputs($fp, "r RENAME \"".UTF7EncodeString($from)."\" \"".UTF7EncodeString($to)."\"\r\n")){
+  		do{
+  			$line=iil_ReadLine($fp, 300);
+  		}while($line[0]!="r");
+--- 1181,1187 ----
+  
+  function iil_C_RenameFolder(&$conn, $from, $to){
+  	$fp = $conn->fp;
+! 	if (fputs($fp, "r RENAME \"".mb_convert_encoding($from,"UTF7-IMAP", "EUC-JP")."\" \"".mb_convert_encoding($to,"UTF7-IMAP", "EUC-JP")."\"\r\n")){
+  		do{
+  			$line=iil_ReadLine($fp, 300);
+  		}while($line[0]!="r");
+***************
+*** 1193,1199 ****
+  
+  function iil_C_DeleteFolder(&$conn, $folder){
+  	$fp = $conn->fp;
+! 	if (fputs($fp, "d DELETE \"".UTF7EncodeString($folder)."\"\r\n")){
+  		do{
+  			$line=iil_ReadLine($fp, 300);
+  		}while($line[0]!="d");
+--- 1193,1199 ----
+  
+  function iil_C_DeleteFolder(&$conn, $folder){
+  	$fp = $conn->fp;
+! 	if (fputs($fp, "d DELETE \"".mb_convert_encoding($folder,"UTF7-IMAP", "EUC-JP")."\"\r\n")){
+  		do{
+  			$line=iil_ReadLine($fp, 300);
+  		}while($line[0]!="d");
+***************
+*** 1210,1216 ****
+  	$message = str_replace("\n", "\r\n", $message);		
+  
+  	$len = strlen($message);
+! 	$request="A APPEND \"".UTF7EncodeString($folder)."\" (\\Seen) {".$len."}\r\n";
+  	if (fputs($fp, $request)){
+  		$line=iil_ReadLine($fp, 100);
+  
+--- 1210,1216 ----
+  	$message = str_replace("\n", "\r\n", $message);		
+  
+  	$len = strlen($message);
+! 	$request="A APPEND \"".mb_convert_encoding($folder,"UTF7-IMAP", "EUC-JP")."\" (\\Seen) {".$len."}\r\n";
+  	if (fputs($fp, $request)){
+  		$line=iil_ReadLine($fp, 100);
+  
+***************
+*** 1244,1250 ****
+  	$len = filesize($path);
+  	
+  	//send APPEND command
+! 	$request="A APPEND \"".UTF7EncodeString($folder)."\" (\\Seen) {".$len."}\r\n";
+  	$bytes_sent = 0;
+  	if (fputs($fp, $request)){
+  		$line=iil_ReadLine($fp, 100);
+--- 1244,1250 ----
+  	$len = filesize($path);
+  	
+  	//send APPEND command
+! 	$request="A APPEND \"".mb_convert_encoding($folder,"UTF7-IMAP", "EUC-JP")."\" (\\Seen) {".$len."}\r\n";
+  	$bytes_sent = 0;
+  	if (fputs($fp, $request)){
+  		$line=iil_ReadLine($fp, 100);
+***************
+*** 1356,1359 ****
+  	return (iil_C_Expunge($conn, $folder) >= 0);
+  }
+  
+! ?>
+\ No newline at end of file
+--- 1356,1359 ----
+  	return (iil_C_Expunge($conn, $folder) >= 0);
+  }
+  
+! ?>
