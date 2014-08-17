@@ -1,0 +1,46 @@
+diff -ru /tmp/IlohaMail-0.8.13/IlohaMail/lang/EUC-JP.inc /usr/local/www/ilohamail/lang/EUC-JP.inc
+--- /tmp/IlohaMail-0.8.13/IlohaMail/lang/EUC-JP.inc	Mon Jun 30 05:26:32 2003
++++ /usr/local/www/ilohamail/lang/EUC-JP.inc	Wed Mar 29 17:18:41 2006
+@@ -16,7 +16,7 @@
+ //	see http://www.fsf.org/copyleft/gpl.html
+ ////////////////////////////
+ 
+-include("../lang/jp/jcode.inc");
++include_once("../lang/jp/jcode.inc");
+ include_once("../include/qp_enc.inc");
+ 
+ function LangIs8Bit($string){
+@@ -55,7 +55,7 @@
+ function LangEncodeMessage($input, $charset){
+ 	$message=$input;
+ 	
+-	$result["type"]="Content-Type: text/plain; charset=\"us-ascii\"\r\n";	
++	$result["type"]="Content-Type: text/plain; charset=\"iso-2022-jp\"\r\n";	
+ 	$result["data"]=$message;
+ 	
+ 	if (strcasecmp($charset, "x-euc-jp")==0){
+Only in /usr/local/www/ilohamail/lang: EUC-JP.inc.org
+diff -ru /tmp/IlohaMail-0.8.13/IlohaMail/lang/jp/compose.inc /usr/local/www/ilohamail/lang/jp/compose.inc
+--- /tmp/IlohaMail-0.8.13/IlohaMail/lang/jp/compose.inc	Mon Mar  3 12:40:50 2003
++++ /usr/local/www/ilohamail/lang/jp/compose.inc	Thu Feb 16 20:13:40 2006
+@@ -26,7 +26,7 @@
+ $composeStrings[6] = "リストを隠す";
+ $composeStrings[7] = "メッセージ本文:";
+ $composeStrings[8] = "追加";
+-$composeStrings[9] = "%d付けの%sのメールによると：\n";
++$composeStrings[9] = "%d付けのメール：\n";
+ $composeStrings[10] = "---以下原文---\n";
+ $composeStrings[11] = "キャンセル";
+ 
+diff -ru /tmp/IlohaMail-0.8.13/IlohaMail/lang/jp/prefs.inc /usr/local/www/ilohamail/lang/jp/prefs.inc
+--- /tmp/IlohaMail-0.8.13/IlohaMail/lang/jp/prefs.inc	Fri Jul 18 17:08:33 2003
++++ /usr/local/www/ilohamail/lang/jp/prefs.inc	Thu Apr  6 18:01:36 2006
+@@ -24,6 +24,8 @@
+ $prefsStrings["0.2"] = "Email: ";
+ $prefsStrings["0.3"] = "「%s」ページで設定できます。";
+ $prefsStrings["0.4"] = "未指定";
++$prefsStrings["0.5"] = "署名: ";
++$prefsStrings["0.6"] = "設定済み";
+ $prefsStrings["1.0"] = "言語";
+ $prefsStrings["1.1"] = "インターフェース言語: ";
+ $prefsStrings["1.2"] = "標準文字コード: ";

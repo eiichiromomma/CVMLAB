@@ -1,0 +1,118 @@
+diff -u /tmp/IlohaMail-0.8.13/IlohaMail/source/compose.php /usr/local/www/ilohamail/source/compose.php
+--- /tmp/IlohaMail-0.8.13/IlohaMail/source/compose.php	Mon Mar 17 16:46:20 2003
++++ /usr/local/www/ilohamail/source/compose.php	Thu Oct  6 10:34:55 2005
+@@ -230,13 +230,13 @@
+ 								$num_parts++;
+ 									
+ 								//get name and type
+-								$a_name=base64_decode($file_parts[1]);
++								$a_name=JcodeConvert(base64_decode($file_parts[1]),0,3);
+ 								$a_type=strtolower(base64_decode($file_parts[2]));
+ 								if ($a_type=="") $a_type="application/octet-stream";								
+ 								
+ 								//stick it in conent array
+-								$part[$num_parts]["type"]="Content-Type: ".$a_type."; name=\"".$a_name."\"\n";
+-								$part[$num_parts]["disposition"]="Content-Disposition: attachment; filename=\"".$a_name."\"\n";
++								$part[$num_parts]["type"]="Content-Type: ".$a_type."; name=\""."=?iso-2022-jp?B?".base64_encode($a_name)."?="."\"\n";
++								$part[$num_parts]["disposition"]="Content-Disposition: attachment; filename=\""."=?iso-2022-jp?B?".base64_encode($a_name)."?="."\"\n";
+ 								$part[$num_parts]["encoding"]="Content-Transfer-Encoding: base64\n";
+ 								$part[$num_parts]["data"]=myWordWrap(base64_encode($a_data),76);
+ 							}
+diff -u /tmp/IlohaMail-0.8.13/IlohaMail/source/compose2.php /usr/local/www/ilohamail/source/compose2.php
+--- /tmp/IlohaMail-0.8.13/IlohaMail/source/compose2.php	Mon Jun 28 11:51:07 2004
++++ /usr/local/www/ilohamail/source/compose2.php	Thu Oct  6 10:34:55 2005
+@@ -41,6 +41,7 @@
+ include("../include/version.inc");
+ include("../include/mod_base64.inc");
+ include("../conf/defaults.inc");
++mb_http_output("euc-jp");
+ if ($GPG_ENABLE){
+ 	include_once("../include/gpg.inc");
+ }
+@@ -357,7 +358,7 @@
+ 							$a_path = $uploadDir."/".$file;
+ 
+ 							//get name and type
+-							$a_name=mod_base64_decode($file_parts[1]);
++							$a_name=JcodeConvert(mod_base64_decode($file_parts[1]),0,3);
+ 							$a_type=strtolower(mod_base64_decode($file_parts[2]));
+ 							if ($a_type=="") $a_type="application/octet-stream";								
+ 
+@@ -367,8 +368,8 @@
+ 								$num_parts++;			
+ 								
+ 								//stick it in conent array
+-								$part[$num_parts]["type"]="Content-Type: ".$a_type."; name=\"".$a_name."\"\r\n";
+-								$part[$num_parts]["disposition"]="Content-Disposition: attachment; filename=\"".$a_name."\"\r\n";
++								$part[$num_parts]["type"]="Content-Type: ".$a_type."; name=\""."=?iso-2022-jp?B?".base64_encode($a_name)."?="."\"\r\n";
++								$part[$num_parts]["disposition"]="Content-Disposition: attachment; filename=\""."=?iso-2022-jp?B?".base64_encode($a_name)."?="."\"\r\n";
+ 								$part[$num_parts]["encoding"]="Content-Transfer-Encoding: base64\r\n";
+ 								$part[$num_parts]["size"] = filesize($a_path);
+ 								$attachment_size += $part[$num_parts]["size"];
+Common subdirectories: /tmp/IlohaMail-0.8.13/IlohaMail/source/images and /usr/local/www/ilohamail/source/images
+diff -u /tmp/IlohaMail-0.8.13/IlohaMail/source/prefs.php /usr/local/www/ilohamail/source/prefs.php
+--- /tmp/IlohaMail-0.8.13/IlohaMail/source/prefs.php	Sun Mar 28 17:13:28 2004
++++ /usr/local/www/ilohamail/source/prefs.php	Thu Apr  6 18:03:17 2006
+@@ -128,6 +128,9 @@
+ 				<br><?php echo $prefsStrings["0.2"]?>
+ 					<?php echo ($my_prefs["email_address"]?$my_prefs["email_address"]:$prefsStrings["0.4"])?>
+ 					<input type=hidden name="email_address" value="<?php echo $my_prefs["email_address"]; ?>">
++				<br><?php echo $prefsStrings["0.5"]?>
++					<?php echo ($my_prefs["signature1"]?$prefsStrings["0.6"]:$prefsStrings["0.4"])?>
++					<input type=hidden name="signature1" value="<?php echo $my_prefs["signature1"]; ?>">
+ 				<p><font size="-1">
+ 				<?php
+ 				$ident_link = "<a href=\"pref_identities.php?user=$user\">".$prefHeaderStrings[3]."</a>";
+Common subdirectories: /tmp/IlohaMail-0.8.13/IlohaMail/source/themes and /usr/local/www/ilohamail/source/themes
+diff -u /tmp/IlohaMail-0.8.13/IlohaMail/source/view.php /usr/local/www/ilohamail/source/view.php
+--- /tmp/IlohaMail-0.8.13/IlohaMail/source/view.php	Tue Dec 30 18:12:56 2003
++++ /usr/local/www/ilohamail/source/view.php	Thu Oct  6 10:34:55 2005
+@@ -30,6 +30,8 @@
+ 
+ include_once("../include/super2global.inc");
+ include_once("../include/nocache.inc");
++include_once("../lang/jp/jcode.inc");
++mb_http_output("pass");
+ 
+ if ((isset($user))&&(isset($folder))){
+ 	include_once("../include/session_auth.inc");
+@@ -153,7 +155,7 @@
+ 			}
+ 			//$body=LangConvert($body, $my_charset, $charset);
+ 			$tnef_files=tnef_decode($body);
+-			header("Content-type: ".$tnef_files[$tneffid]['type0']."/".$tnef_files[$tneffid]['type1']."; name=\"".$tnef_files[$tneffid]['name']."\"");
++			header("Content-type: ".$tnef_files[$tneffid]['type0']."/".$tnef_files[$tneffid]['type1']."; name=\n\t\"".$tnef_files[$tneffid]['name']."\"");
+ 			header("Content-Disposition: ".$DISPOSITION_MODE."; filename=\"".$tnef_files[$tneffid]['name']."\"");
+ 			header("Expires: 0");
+ 			header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+@@ -175,24 +177,24 @@
+ 
+ 			// format and send HTTP header
+ 			if ($type==$MIME_APPLICATION){
+-				$name = str_replace("/",".",iml_GetPartName($structure, $part));
+-				header("Content-type: $typestr; name=\"".$name."\"");
+-				header("Content-Disposition: ".$DISPOSITION_MODE."; filename=\"".$name."\"");
++				$name = mb_decode_mimeheader(str_replace("/",".",iml_GetPartName($structure, $part)));
++				header("Content-type: $typestr; name=\n\t\"".$name."\"");
++				header("Content-Disposition: ".$DISPOSITION_MODE."; filename=\"".JcodeConvert($name,0,2)."\"");
+ 				header("Expires: 0");
+ 				header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+ 				header("Pragma: public");
+ 			}else if ($type==$MIME_MESSAGE){
+-				$name=str_replace("/",".", iml_GetPartName($structure, $part));
++				$name=mb_decode_mimeheader(str_replace("/",".", iml_GetPartName($structure, $part)));
+ 				header("Content-Type: text/plain; name=\"".$name."\"");
+ 			}else if ($type != $MIME_INVALID){
+ 				$charset=iml_GetPartCharset($structure, $part);
+-				$name=str_replace("/",".", iml_GetPartName($structure, $part));
++				$name=mb_decode_mimeheader(str_replace("/",".", iml_GetPartName($structure, $part)));
+ 				$header="Content-type: $typestr";
+ 				if (!empty($charset)) $header.="; charset=\"".$charset."\"";
+ 				if (!empty($name)) $header.="; name=\"".$name."\"";
+ 				header($header);
+ 				if ($type!=$MIME_TEXT && $type!=$MIME_IMAGE){
+-					header("Content-Disposition: ".$DISPOSITION_MODE."; filename=\"".$name."\"");
++					header("Content-Disposition: ".$DISPOSITION_MODE."; filename=\"".JcodeConvert($name,0,2)."\"");
+ 					header("Expires: 0");
+ 					header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+ 					header("Pragma: public");
